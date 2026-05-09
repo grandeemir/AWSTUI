@@ -1,4 +1,9 @@
 import json
+import subprocess
+import shlex
+import os
+import asyncio
+import shutil
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Header, Footer, Static, ListItem, ListView, Label, DataTable, Input
@@ -14,6 +19,7 @@ from .aws.cloudwatch import CloudWatchAdapter
 from .aws.ecs import ECSAdapter
 from .ui.screens.confirmation import ConfirmationScreen
 from .ui.screens.settings import SettingsScreen
+from .utils.credentials_store import set_last_used_credential, get_last_used_credential, load_stored_credentials
 
 class NavigationPanel(Static):
     def compose(self) -> ComposeResult:
@@ -48,6 +54,7 @@ class AWSTUIApp(App):
         ("s", "stop_resource", "Stop Resource"),
         ("t", "start_resource", "Start Resource"),
         ("x", "terminate_resource", "Terminate Resource"),
+        ("c", "connect_instance", "Connect (SSM)"),
         ("p", "open_settings", "Settings (Profile/Region)"),
     ]
 
@@ -79,6 +86,20 @@ class AWSTUIApp(App):
     def on_mount(self) -> None:
         table = self.query_one("#resource-table", DataTable)
         table.cursor_type = "row"
+        
+        # Load last used credentials
+        last_used = get_last_used_credential()
+        if last_used:
+            stored_creds = load_stored_credentials()
+            if last_used in stored_creds:
+                creds = stored_creds[last_used]
+                self.client_manager.update_config(
+                    access_key=creds["access_key"],
+                    secret_key=creds["secret_key"]
+                )
+            else:
+                self.client_manager.update_config(profile_name=last_used)
+        
         self.update_subtitle()
 
     def action_toggle_danger_mode(self) -> None:
@@ -111,6 +132,17 @@ class AWSTUIApp(App):
                 access_key=result.get("access_key"),
                 secret_key=result.get("secret_key")
             )
+            # Persist last used
+            if result.get("profile"):
+                set_last_used_credential(result["profile"])
+            elif result.get("access_key"):
+                # Find the name from stored users
+                stored = load_stored_credentials()
+                for name, creds in stored.items():
+                    if creds["access_key"] == result["access_key"]:
+                        set_last_used_credential(name)
+                        break
+
             self.update_subtitle()
             self.notify(f"Config updated: {result.get('profile') or 'Manual Keys'} @ {result.get('region')}")
             self.refresh_resources()
@@ -232,6 +264,74 @@ class AWSTUIApp(App):
             confirmed = await self.push_screen_wait(ConfirmationScreen("TERMINATE EC2 Instance", resource_id, "TERMINATE EC2"))
             if confirmed:
                 await self.execute_action(self.adapters["nav-ec2"].terminate_instance, resource_id)
+
+    @work
+    async def action_connect_instance(self) -> None:
+        if self.current_service != "nav-ec2":
+            return
+            
+        table = self.query_one("#resource-table", DataTable)
+        if table.cursor_row < 0:
+            return
+            
+        try:
+            instance_id = table.get_row_at(table.cursor_row)[0]
+        except Exception:
+            return
+
+        # 1. Robust check for session-manager-plugin
+        plugin_path = shutil.which("session-manager-plugin")
+        
+        # If not in PATH, check common macOS locations
+        if not plugin_path:
+            common_paths = [
+                "/usr/local/bin/session-manager-plugin",
+                "/opt/homebrew/bin/session-manager-plugin",
+                "/usr/bin/session-manager-plugin"
+            ]
+            for p in common_paths:
+                if os.path.exists(p):
+                    plugin_path = p
+                    break
+
+        if not plugin_path:
+            # Plugin is missing, show a clear warning
+            self.notify(
+                "ERROR: SSM Plugin Missing. Please run: brew install --cask session-manager-plugin",
+                title="Prerequisite Missing",
+                severity="error",
+                timeout=10
+            )
+            return
+
+        self.notify(f"Checking SSM status for {instance_id}...")
+        is_online = await self.adapters["nav-ec2"].check_ssm_status(instance_id)
+        
+        if not is_online:
+            self.notify(f"Instance {instance_id} is NOT online in SSM.", severity="error")
+            return
+
+        # Prepare the AWS CLI command
+        profile_cmd = f"--profile {self.client_manager.profile_name}" if self.client_manager.profile_name else ""
+        region_cmd = f"--region {self.client_manager.region_name}" if self.client_manager.region_name else ""
+        
+        # Manual keys env string
+        env_str = ""
+        if self.client_manager.access_key:
+            env_str = f"export AWS_ACCESS_KEY_ID={self.client_manager.access_key} && export AWS_SECRET_ACCESS_KEY={self.client_manager.secret_key} && "
+            if self.client_manager.region_name:
+                env_str += f"export AWS_DEFAULT_REGION={self.client_manager.region_name} && "
+
+        full_cmd = f"{env_str}aws ssm start-session --target {instance_id} {profile_cmd} {region_cmd}"
+        
+        self.notify(f"Opening SSM session for {instance_id} in new window...")
+        
+        # macOS specific: Open in a new Terminal window using AppleScript
+        applescript = f'tell application "Terminal" to do script "{full_cmd}"'
+        try:
+            subprocess.run(["osascript", "-e", applescript])
+        except Exception as e:
+            self.notify(f"Failed to open new terminal: {e}", severity="error")
 
     async def execute_action(self, action_func, resource_id: str) -> None:
         self.notify(f"Executing action on {resource_id}...")

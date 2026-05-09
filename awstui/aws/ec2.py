@@ -37,3 +37,15 @@ class EC2Adapter(BaseAWSAdapter):
     async def terminate_instance(self, instance_id: str) -> Dict[str, Any]:
         async with self.client_manager.get_client("ec2") as client:
             return await client.terminate_instances(InstanceIds=[instance_id])
+
+    async def check_ssm_status(self, instance_id: str) -> bool:
+        """Check if the instance is online in SSM."""
+        async with self.client_manager.get_client("ssm") as client:
+            try:
+                response = await client.describe_instance_information(
+                    Filters=[{'Key': 'InstanceIds', 'Values': [instance_id]}]
+                )
+                info = response.get("InstanceInformationList", [])
+                return len(info) > 0 and info[0]["PingStatus"] == "Online"
+            except Exception:
+                return False

@@ -1,0 +1,25 @@
+{
+  "name": "awstui",
+  "version": "1.0.4",
+  "description": "Professional AWS TUI Manager",
+  "main": "main.py",
+  "bin": {
+    "awstui": "bin/awstui.js"
+  },
+  "scripts": {
+    "install-deps": "pip3 install -r requirements.txt"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/user/awstui"
+  },
+  "keywords": [
+    "aws",
+    "tui",
+    "terminal",
+    "cloud"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {}
+}
