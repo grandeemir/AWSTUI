@@ -1,0 +1,148 @@
+/* Professional Palette */
+$background: #1e1e1e;
+$surface: #252526;
+$app-panel: #2d2d30;
+$primary: #007acc;
+$accent: #3794ff;
+$error: #f44336;
+$warning: #ff9800;
+$success: #4caf50;
+
+Screen {
+    background: $background;
+}
+
+#navigation {
+    width: 25;
+    height: 100%;
+    border-right: tall $primary;
+    background: $surface;
+}
+
+#main-content {
+    width: 1fr;
+    height: 100%;
+}
+
+#details-pane {
+    width: 40;
+    height: 100%;
+    border-left: tall $primary;
+    background: $surface;
+    padding: 1;
+}
+
+#details-content {
+    width: 100%;
+    height: 1fr;
+    overflow-y: scroll;
+    color: #cccccc;
+    text-style: italic;
+}
+
+.details-header {
+    width: 100%;
+    background: $primary;
+    color: white;
+    text-align: center;
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+#search-input {
+    margin: 1;
+    border: tall $primary;
+}
+
+DataTable {
+    height: 1fr;
+    margin: 0 1;
+}
+
+ListView {
+    background: transparent;
+}
+
+ListItem {
+    padding: 0 1;
+}
+
+ListItem:focus {
+    background: $accent;
+    color: white;
+}
+
+Header {
+    background: $primary;
+    color: white;
+}
+
+Footer {
+    background: #333333;
+}
+
+#confirmation-dialog {
+    width: 60;
+    height: auto;
+    background: $surface;
+    border: tall $error;
+    padding: 1 2;
+    align: center middle;
+}
+
+#confirmation-dialog Label {
+    width: 100%;
+    text-align: center;
+    margin-bottom: 1;
+}
+
+#confirmation-title {
+    width: 100%;
+    text-align: center;
+    color: $error;
+    text-style: bold;
+    margin-bottom: 1;
+}
+
+#confirmation-input {
+    margin: 1 0;
+}
+
+#confirmation-dialog Horizontal {
+    height: auto;
+    align: center middle;
+}
+
+#confirmation-dialog Button {
+    margin: 0 1;
+}
+
+#settings-dialog {
+    width: 50;
+    height: auto;
+    background: $surface;
+    border: tall $primary;
+    padding: 1 2;
+    align: center middle;
+}
+
+#settings-title {
+    width: 100%;
+    text-align: center;
+    text-style: bold underline;
+    margin-bottom: 1;
+}
+
+#settings-dialog Label {
+    margin-top: 1;
+}
+
+#settings-buttons {
+    margin-top: 2;
+    height: auto;
+    align: center middle;
+}
+
+#settings-buttons Button {
+    margin: 0 1;
+}
